@@ -1,6 +1,7 @@
 -- =====================================================================
 -- 代辦事項追蹤 V2.0.0（建議版本）— 第二階段：收回匿名權限、鎖定流程
--- 執行時機：新版前端上線，且主管與同仁「都已確認能登入、操作正常」之後
+-- 執行時機：新版 todo.html 與 admin.html 上線，且主管與同仁「都已確認能登入、操作正常」之後
+-- 範圍：代辦事項（todo_items／todo_updates／todo-photos）＋病床看板（hospital_wards／notes／meta／admin）
 -- 影響：⚠️ 舊版網頁與未登入的人將完全無法讀寫；舊照片的公開網址失效
 --       （新版前端會自動改用簽章網址顯示舊照片）
 -- =====================================================================
@@ -88,6 +89,25 @@ create trigger todo_items_guard
   before insert or update on public.todo_items
   for each row execute function public.todo_items_guard();
 
+-- 5. 病床看板：前台照常公開讀取，只有已登入員工可以修改（admin.html V2.0.0 起需登入）
+do $$
+declare t text;
+begin
+  foreach t in array array['hospital_wards', 'hospital_notes', 'hospital_meta'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('revoke insert, update, delete, truncate on public.%I from anon', t);
+    execute format('drop policy if exists "v2 staff write" on public.%I', t);
+    execute format('create policy "v2 staff write" on public.%I for all to authenticated
+                      using (public.is_staff()) with check (public.is_staff())', t);
+  end loop;
+end $$;
+-- 原有的 "Allow public read"（SELECT）規則保留，前台 index.html 不受影響
+
+-- 6. hospital_admin：舊的共用密碼表已無頁面使用，收回匿名讀取／修改
+drop policy if exists "public read admin config"   on public.hospital_admin;
+drop policy if exists "public update admin config" on public.hospital_admin;
+revoke all on public.hospital_admin from anon;
+
 commit;
 
 -- =====================================================================
@@ -109,4 +129,8 @@ commit;
 -- grant select, insert, update on public.todo_items, public.todo_updates to anon;
 -- create policy "rollback anon all items"   on public.todo_items   for all to anon using (true) with check (true);
 -- create policy "rollback anon all updates" on public.todo_updates for all to anon using (true) with check (true);
+-- alter table public.hospital_wards disable row level security;
+-- alter table public.hospital_notes disable row level security;
+-- alter table public.hospital_meta  disable row level security;
+-- grant insert, update, delete on public.hospital_wards, public.hospital_notes, public.hospital_meta to anon;
 -- commit;

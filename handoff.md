@@ -85,3 +85,12 @@
 - 驗證：`node --check` 通過、HTML 元素 ID 對應、SQL 經 PostgreSQL parser 解析通過；**尚未在瀏覽器與正式資料庫實測**。
 - 注意：phase2 執行後，`shinghou02-design.github.io` 舊版 todo 頁會讀不到資料（預期行為）。
 - 另發現（未處理）：`hospital_admin` 有 anon 可讀＋可改的規則，`requests_admin_password` 明碼可被任何人讀取或修改；`it_access_requests` 亦為 anon 開放。建議列入階段七處理。
+
+## 部署進度與病床看板修正 — 2026-11-20
+- 資料庫位置確認：Supabase 帳號 `shinghou02@gmail.com`，專案 `shinghou02`（ap-southeast-2）。
+- ✅ 已在正式資料庫執行 `migration_todo_auth_phase1.sql`（13:06，結果 `phase1 ok`）。
+- 檢查發現 `hospital_wards`／`hospital_notes`／`hospital_meta` 的 RLS 為關閉，`admin.html` 無任何登入，任何人可修改病床數與公告。
+- 修正（尚未部署）：`admin.html`／`admin.js` 加入同一套 Supabase Auth 登入（需列入 staff）；`migration_todo_auth_phase2.sql` 新增第 5、6 段：三張病床表啟用 RLS、保留公開讀取、只允許 staff 寫入；`hospital_admin` 收回 anon 讀寫。
+- 部署目標（使用者選定）：`shinghou02-design/shinghou`（目前上線網址）。
+- 待辦：建立人員帳號與 staff 名單 → 部署前端 → 實測 → 執行 phase2。
+- 尚未處理：`requests-admin.html` 無登入，`it_access_requests`（含姓名、員編、手機）anon 可讀可改。
