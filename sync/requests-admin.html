@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>後台 — 共資夾申請管理｜杏和醫院</title>
+  <title>後台 — 網路資源申請管理｜杏和醫院</title>
   <link rel="stylesheet" href="style.css" />
   <style>
     table.req { width: 100%; border-collapse: collapse; background: #fff; font-size: 13.5px; }
@@ -42,15 +42,27 @@
   </style>
 </head>
 <body>
-  <div class="admin-wrap" id="app">
-    <h1>共資夾申請管理</h1>
-    <p class="sub">審核並標註每筆共資夾開通申請的處理狀態。</p>
+  <!-- V2.0.0：登入後才能審核 -->
+  <div class="gate hidden" id="loginBox">
+    <h1>🔐 網路資源申請管理</h1>
+    <p>請使用已開通的帳號登入</p>
+    <input type="email" id="loginEmail" placeholder="Email" autocomplete="username" />
+    <input type="password" id="loginPassword" placeholder="密碼" autocomplete="current-password" />
+    <div class="err-msg" id="loginMsg"></div>
+    <button class="btn btn-primary" id="loginBtn" style="width:100%">登入</button>
+  </div>
+
+  <div class="admin-wrap hidden" id="app">
+    <h1>網路資源申請管理</h1>
+    <p class="sub">審核並標註每筆網路／資料夾／USB 開通申請的處理狀態。</p>
 
     <div class="topbar">
       <button class="btn btn-primary btn-sm" id="reloadBtn">↺ 重新整理</button>
       <button class="btn btn-ghost btn-sm" id="exportBtn">📥 匯出 XLSX</button>
       <a class="link" href="request.html" target="_blank">🔗 開啟申請表單 ↗</a>
       <a class="link" href="todo.html" target="_blank">🔗 代辦事項追蹤 ↗</a>
+      <span style="margin-left:auto;font-size:13px;color:#555">目前登入：<strong id="whoName"></strong></span>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn">登出</button>
     </div>
 
     <div class="filters">
@@ -64,7 +76,7 @@
       </select>
       <div class="handler-box">
         <label>處理人</label>
-        <input type="text" id="handlerName" placeholder="你的姓名" style="width:120px;" />
+        <input type="text" id="handlerName" placeholder="你的姓名" style="width:120px;" readonly />
       </div>
     </div>
 
@@ -75,10 +87,11 @@
             <th>提交時間</th>
             <th>院別</th>
             <th>姓名</th>
-            <th>部門／單位</th>
+            <th>單位／職稱</th>
             <th>分機</th>
-            <th>手機</th>
+            <th>網路</th>
             <th>資料夾</th>
+            <th>USB</th>
             <th>狀態</th>
             <th>備註</th>
             <th>操作</th>
@@ -93,6 +106,7 @@
   <div class="toast" id="toast"></div>
 
   <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="requests-admin.js"></script>
 </body>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>共資夾開通申請書｜杏和/杏永醫院</title>
+  <title>網路暨電腦資源開通申請書｜杏和/杏永醫院</title>
   <link rel="stylesheet" href="style.css" />
   <style>
     .form-wrap {
@@ -70,7 +70,7 @@
 </head>
 <body>
   <div class="form-wrap" id="app">
-    <h1>共資夾開通申請書</h1>
+    <h1>網路暨電腦資源開通申請書</h1>
     <p class="sub">杏和/杏永醫院</p>
 
     <form id="reqForm">
@@ -102,16 +102,16 @@
             <input type="text" id="department" />
           </div>
           <div class="field">
+            <label>職稱</label>
+            <input type="text" id="title" />
+          </div>
+          <div class="field">
             <label>員工編號</label>
             <input type="text" id="employee_id" />
           </div>
           <div class="field">
             <label>分機電話</label>
             <input type="text" id="extension" />
-          </div>
-          <div class="field">
-            <label>手機電話</label>
-            <input type="text" id="mobile" inputmode="tel" />
           </div>
         </div>
       </div>
@@ -120,7 +120,15 @@
         <h2>申請項目</h2>
 
         <div class="item-row">
-          <div class="item-name">共用資料夾開通</div>
+          <div class="item-name">1. 對外網路開通</div>
+          <div class="choice-row">
+            <label><input type="radio" name="net_access" value="是" /> 是</label>
+            <label><input type="radio" name="net_access" value="否" /> 否</label>
+          </div>
+        </div>
+
+        <div class="item-row">
+          <div class="item-name">2. 共用資料夾開通</div>
           <div class="choice-row" style="margin-bottom:10px;">
             <label><input type="checkbox" id="folder_shinghou" /> 杏和醫院共資夾</label>
             <label><input type="checkbox" id="folder_shingyong" /> 杏永醫院共資夾</label>
@@ -129,6 +137,14 @@
             <span style="font-size:13px;color:#666;">開通：</span>
             <label><input type="radio" name="folder_access" value="是" /> 是</label>
             <label><input type="radio" name="folder_access" value="否" /> 否</label>
+          </div>
+        </div>
+
+        <div class="item-row">
+          <div class="item-name">3. 電腦 USB 開通</div>
+          <div class="choice-row">
+            <label><input type="radio" name="usb_access" value="是" /> 是</label>
+            <label><input type="radio" name="usb_access" value="否" /> 否</label>
           </div>
         </div>
       </div>
@@ -171,6 +187,7 @@
   <div class="toast" id="toast"></div>
 
   <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js"></script>
   <script src="request.js"></script>
 </body>
 </html>

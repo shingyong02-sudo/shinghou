@@ -1,6 +1,7 @@
 const { url, anonKey } = window.SUPABASE_CONFIG;
 const REST = `${url.replace(/\/$/, '')}/rest/v1`;
-const HEADERS = { apikey: anonKey, Authorization: `Bearer ${anonKey}`, 'Content-Type': 'application/json' };
+// V2.0.0（建議版本）：加入 Supabase Auth 登入，只有 staff 名冊內的人員可以檢視與審核
+const sb = window.supabase.createClient(url.replace(/\/$/, ''), anonKey, { auth: { persistSession: true, autoRefreshToken: true } });
 
 const $ = (id) => document.getElementById(id);
 const toastEl = $('toast'), rowsEl = $('rows'), emptyMsg = $('emptyMsg');
@@ -12,9 +13,14 @@ function toast(msg, isErr = false) {
 }
 
 async function api(path, method = 'GET', body = null) {
-  const opt = { method, headers: HEADERS };
-  if (body) { opt.body = JSON.stringify(body); opt.headers.Prefer = 'return=representation'; }
+  const { data } = await sb.auth.getSession();
+  const token = data.session && data.session.access_token;
+  if (!token) { showLogin('登入已過期，請重新登入'); throw new Error('未登入'); }
+  const headers = { apikey: anonKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const opt = { method, headers };
+  if (body) { opt.body = JSON.stringify(body); headers.Prefer = 'return=representation'; }
   const r = await fetch(`${REST}/${path}`, opt);
+  if (r.status === 401) { showLogin('登入已過期，請重新登入'); throw new Error('未登入'); }
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   if (r.status === 204) return null;
   return r.json();
@@ -28,12 +34,48 @@ function fmtDateTime(iso) {
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// 已移除登入密碼保護，直接載入
-try {
-  const savedHandler = localStorage.getItem('shinghou_handler_name');
-  if (savedHandler) $('handlerName').value = savedHandler;
-} catch (e) {}
-load();
+// ---------- 登入 / 登出（處理人自動帶入登入者姓名） ----------
+function showLogin(msg = '') {
+  $('app').classList.add('hidden');
+  $('loginBox').classList.remove('hidden');
+  $('loginMsg').textContent = msg;
+}
+
+async function enterApp() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return showLogin();
+  const rows = await api(`staff?user_id=eq.${user.id}&select=name,role`);
+  if (!rows.length) {
+    await sb.auth.signOut();
+    return showLogin('此帳號尚未開通，請聯絡系統管理員');
+  }
+  $('whoName').textContent = rows[0].name;
+  $('handlerName').value = rows[0].name;
+  $('loginBox').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  load();
+}
+
+$('loginBtn').addEventListener('click', async () => {
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  if (!email || !password) return ($('loginMsg').textContent = '請輸入 Email 與密碼');
+  $('loginBtn').disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  $('loginBtn').disabled = false;
+  if (error) return ($('loginMsg').textContent = '登入失敗：帳號或密碼錯誤');
+  $('loginPassword').value = '';
+  try { await enterApp(); } catch (e) { showLogin('讀取失敗：' + e.message); }
+});
+$('loginPassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('loginBtn').click(); });
+$('logoutBtn').addEventListener('click', async () => { await sb.auth.signOut(); showLogin('已登出'); });
+
+(async () => {
+  try {
+    const { data } = await sb.auth.getSession();
+    if (data.session) await enterApp(); else showLogin();
+  } catch (e) { showLogin('讀取失敗：' + e.message); }
+})();
 
 // ---------- Export XLSX ----------
 let currentRows = [];
@@ -57,18 +99,19 @@ async function exportRequestsXlsx() {
       { header: '提交時間', key: 'created_at', width: 17 },
       { header: '院別', key: 'hospital', width: 14 },
       { header: '姓名', key: 'name', width: 10 },
-      { header: '部門／單位', key: 'dept', width: 18 },
+      { header: '部門／職稱', key: 'dept', width: 18 },
       { header: '員工編號', key: 'employee_id', width: 10 },
       { header: '分機', key: 'extension', width: 8 },
-      { header: '手機', key: 'mobile', width: 13 },
+      { header: '對外網路', key: 'net_access', width: 9 },
       { header: '共用資料夾', key: 'folder', width: 20 },
+      { header: 'USB開通', key: 'usb_access', width: 9 },
       { header: '狀態', key: 'status', width: 10 },
       { header: '備註', key: 'handle_note', width: 28 },
       { header: '處理人', key: 'handled_by', width: 10 },
       { header: '處理時間', key: 'handled_at', width: 17 },
     ];
 
-    const ws = wb.addWorksheet('共資夾申請記錄', {
+    const ws = wb.addWorksheet('網路資源申請記錄', {
       views: [{ state: 'frozen', ySplit: 2 }],
       pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
     });
@@ -76,7 +119,7 @@ async function exportRequestsXlsx() {
 
     ws.mergeCells(1, 1, 1, cols.length);
     const titleCell = ws.getCell(1, 1);
-    titleCell.value = `杏和／杏永醫院集團 — 共資夾開通申請記錄（匯出時間：${fmtDateTime(new Date().toISOString())}）`;
+    titleCell.value = `杏和／杏永醫院集團 — 網路暨電腦資源開通申請記錄（匯出時間：${fmtDateTime(new Date().toISOString())}）`;
     titleCell.font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
     titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
     titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2E7D32' } };
@@ -102,11 +145,12 @@ async function exportRequestsXlsx() {
         created_at: fmtDateTime(r.created_at),
         hospital: r.hospital,
         name: r.name,
-        dept: r.department || '',
+        dept: [r.department, r.title].filter(Boolean).join(' / '),
         employee_id: r.employee_id || '',
         extension: r.extension || '',
-        mobile: r.mobile || '',
+        net_access: r.net_access || '',
         folder: folderLine,
+        usb_access: r.usb_access || '',
         status: r.status,
         handle_note: r.handle_note || '',
         handled_by: r.handled_by || '',
@@ -132,7 +176,7 @@ async function exportRequestsXlsx() {
     const blob = new Blob([buf], { type: 'application/octet-stream' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `共資夾申請記錄_${todayStr()}.xlsx`;
+    a.download = `網路資源申請記錄_${todayStr()}.xlsx`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
     toast('✓ 已匯出 XLSX');
@@ -152,10 +196,11 @@ function rowHtml(r) {
       <td>${fmtDateTime(r.created_at)}</td>
       <td class="left">${esc(r.hospital)}</td>
       <td class="left">${esc(r.name)}</td>
-      <td class="left">${esc(r.department || '')}</td>
+      <td class="left">${esc(r.department || '')}${r.title ? ' / ' + esc(r.title) : ''}</td>
       <td>${esc(r.extension || '—')}</td>
-      <td>${esc(r.mobile || '—')}</td>
+      <td>${esc(r.net_access || '—')}</td>
       <td>${folderLine}</td>
+      <td>${esc(r.usb_access || '—')}</td>
       <td><select class="f-status">${statusOptions}</select></td>
       <td><input type="text" class="f-note" value="${esc(r.handle_note || '').replace(/"/g, '&quot;')}" /></td>
       <td>
@@ -193,7 +238,6 @@ async function onSave(e) {
   const status = tr.querySelector('.f-status').value;
   const note = tr.querySelector('.f-note').value;
   const handler = $('handlerName').value.trim();
-  try { localStorage.setItem('shinghou_handler_name', handler); } catch (err) {}
 
   try {
     await api(`it_access_requests?id=eq.${id}`, 'PATCH', {
